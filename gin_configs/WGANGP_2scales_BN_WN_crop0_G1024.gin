@@ -1,0 +1,43 @@
+# -*-Python-*-
+
+# Generator and Discriminator configs with weightnorm
+
+
+import __nn_utils
+
+
+beta1 = 0.
+beta2 = 0.9
+gan_model = "WGANGP"
+gp_weight = 10.
+
+target_sr = 16000
+target_dur = 2.
+
+
+__nn_utils.Generator.z_prior = "normal"
+__nn_utils.Generator.dense_chan_out = 32
+__nn_utils.Generator.target_sr = %target_sr
+__nn_utils.Generator.z_dim = 128
+__nn_utils.Generator.target_dur = %target_dur
+__nn_utils.Generator.strides = [4,4,4,4,4]
+__nn_utils.Generator.n_dense = 1
+__nn_utils.Generator.dense_hidden = -1
+__nn_utils.Generator.dense_norm = "BN"
+__nn_utils.Generator.conv_norm = "BN"
+__nn_utils.Generator.chan_in = 1024
+__nn_utils.Generator.crop_steps = 0
+__nn_utils.Generator.dp = 0.
+
+
+__nn_utils.MultiScaleDiscriminator.disc_norm = "WN"
+__nn_utils.MultiScaleDiscriminator.disc_scales = 2
+__nn_utils.MultiScaleDiscriminator.target_sr = %target_sr
+__nn_utils.MultiScaleDiscriminator.target_dur = %target_dur
+
+
+
+
+
+
+
