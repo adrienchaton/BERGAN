@@ -396,6 +396,53 @@ class Discriminator_LN(nn.Module):
         return features[:-1], features[-1]
 
 
+# note: there is TORCH.NN.UTILS.REMOVE_SPECTRAL_NORM but we dont need it as the discriminator is only used for training
+class Discriminator_SN(nn.Module):
+    def __init__(self):
+        super(Discriminator_SN, self).__init__()
+
+        self.discriminator = nn.ModuleList([
+            nn.Sequential(
+                nn.ReflectionPad1d(7),
+                nn.utils.spectral_norm(nn.Conv1d(1, 16, kernel_size=15, stride=1)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.spectral_norm(nn.Conv1d(16, 64, kernel_size=41, stride=4, padding=20, groups=4)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.spectral_norm(nn.Conv1d(64, 256, kernel_size=41, stride=4, padding=20, groups=16)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.spectral_norm(nn.Conv1d(256, 1024, kernel_size=41, stride=4, padding=20, groups=64)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.spectral_norm(nn.Conv1d(1024, 1024, kernel_size=41, stride=4, padding=20, groups=256)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.Sequential(
+                nn.utils.spectral_norm(nn.Conv1d(1024, 1024, kernel_size=5, stride=1, padding=2)),
+                nn.LeakyReLU(0.2, inplace=True),
+            ),
+            nn.utils.spectral_norm(nn.Conv1d(1024, 1, kernel_size=3, stride=1, padding=1)),
+        ])
+
+    def forward(self, x):
+        '''
+            returns: (list of 6 features, discriminator score)
+            we directly predict score without last sigmoid function
+            since we're using Least Squares GAN (https://arxiv.org/abs/1611.04076)
+        '''
+        features = list()
+        for module in self.discriminator:
+            x = module(x)
+            features.append(x)
+        return features[:-1], features[-1]
+
+
 @gin.configurable
 class MultiScaleDiscriminator(nn.Module):
     def __init__(self,disc_norm="WN",disc_scales=3,target_sr=16000,target_dur=2.):
@@ -410,6 +457,10 @@ class MultiScaleDiscriminator(nn.Module):
         if disc_norm=="BN":
             self.discriminators = nn.ModuleList(
                 [Discriminator_BN() for _ in range(disc_scales)]
+            )
+        if disc_norm=="SN":
+            self.discriminators = nn.ModuleList(
+                [Discriminator_SN() for _ in range(disc_scales)]
             )
         
         self.pooling = nn.ModuleList(
@@ -440,25 +491,38 @@ class MultiScaleDiscriminator(nn.Module):
 
 
 ###############################################################################
-## losses
+## optimization and losses
 
-def melgan_g_loss(generator,discriminator,bs):
-    fake_audio = generator(bs).unsqueeze(1)
-    disc_fake = discriminator(fake_audio)
-    loss_g = 0.0
-    for _, score_fake in disc_fake:
-        loss_g = loss_g+torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
-    return loss_g
+def apply_zero_grad(generator,optimizer_g,discriminator,optimizer_d):
+    generator.zero_grad()
+    optimizer_g.zero_grad()
+
+    discriminator.zero_grad()
+    optimizer_d.zero_grad()
 
 
-def melgan_d_loss(discriminator,fake_audio,real_audio):
-    disc_fake = discriminator(fake_audio)
-    disc_real = discriminator(real_audio)
-    loss_d = 0.0
-    for (_, score_fake), (_, score_real) in zip(disc_fake, disc_real):
-        loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
-        loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
-    return loss_d
+def gradients_status(model, flag):
+    for p in model.parameters():
+        p.requires_grad = flag
+
+
+def enable_disc_disable_gen(generator,discriminator):
+    gradients_status(discriminator, True)
+    gradients_status(generator, False)
+
+
+def enable_gen_disable_disc(generator,discriminator):
+    gradients_status(discriminator, False)
+    gradients_status(generator, True)
+
+
+def disable_all(generator,discriminator):
+    gradients_status(discriminator, False)
+    gradients_status(generator, False)
+
+
+# The discriminator score output is of shape [bs, 1, t]
+# convention adopted is to mean dim0 and sum dim2
 
 
 # WGAN-GP: https://github.com/EmilienDupont/wgan-gp/blob/master/training.py
@@ -484,12 +548,7 @@ def gradient_penalty(discriminator,gp_weight,real_data,generated_data):
     
     loss_gp = 0.0
     for _, prob in prob_interpolated:
-        # Calculate gradients of probabilities with respect to examples
-        # gradients = torch_grad(outputs=prob, inputs=interpolated,
-        #                        grad_outputs=torch.ones(prob.size()).to(discriminator.device),
-        #                        create_graph=True, retain_graph=True)[0]
-        
-        prob = torch.mean(torch.sum(prob, dim=[1, 2]))
+        prob = prob.squeeze(1)
         
         gradients = autograd.grad(outputs=prob,
                                 inputs=interpolated,
@@ -499,7 +558,7 @@ def gradient_penalty(discriminator,gp_weight,real_data,generated_data):
                                 only_inputs=True)[0]
     
         # flatten to easily take norm per example in batch
-        gradients = gradients.view(batch_size, -1)
+        # gradients = gradients.view(batch_size, -1)
         
         # gradient_norm = gradients.norm(2, dim=1).mean()
         # Derivatives of the gradient close to 0 can cause problems because of
@@ -512,31 +571,65 @@ def gradient_penalty(discriminator,gp_weight,real_data,generated_data):
     return loss_gp
 
 
-def wgangp_g_loss(generator,discriminator,bs):
+def __g_loss(gan_model,generator,discriminator,bs):
     fake_audio = generator(bs).unsqueeze(1)
     disc_fake = discriminator(fake_audio)
     loss_g = 0.0
     for _, score_fake in disc_fake:
-        loss_g = loss_g-torch.mean(torch.sum(score_fake, dim=[1, 2]))
-        # loss_g = loss_g-score_fake.mean()
+        if gan_model=="WGANGP":
+            loss_g = loss_g-torch.mean(torch.sum(score_fake, dim=[1, 2]))
+            # loss_g = loss_g-score_fake.mean()
+        if gan_model=="LSGANGP":
+            loss_g = loss_g+torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
     return loss_g
 
 
-def wgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio,disable_GP=False):
+def __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio,disable_GP=False):
     disc_fake = discriminator(fake_audio)
     disc_real = discriminator(real_audio)
     loss_d = 0.0
     for (_, score_fake), (_, score_real) in zip(disc_fake, disc_real):
-        loss_d = loss_d-torch.mean(torch.sum(score_real, dim=[1, 2]))
-        # loss_d = loss_d-score_real.mean()
-        loss_d = loss_d+torch.mean(torch.sum(score_fake, dim=[1, 2]))
-        # loss_d = loss_d+score_fake.mean()
-    if disable_GP is False:
-        # e.g. test step, cannot compute gradient and GP
+        if gan_model=="WGANGP":
+            loss_d = loss_d-torch.mean(torch.sum(score_real, dim=[1, 2]))
+            # loss_d = loss_d-score_real.mean()
+            loss_d = loss_d+torch.mean(torch.sum(score_fake, dim=[1, 2]))
+            # loss_d = loss_d+score_fake.mean()
+        if gan_model=="LSGANGP":
+            loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+            loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+    if disable_GP is False and gp_weight is not None:
         loss_gp = gradient_penalty(discriminator,gp_weight,real_audio,fake_audio)
     else:
+        # e.g. test step, cannot compute gradient and GP
         loss_gp = 0.0
     return loss_d,loss_gp
+
+
+# Least-square GAN
+# we dont use log-loss GAN to avoid sigmoid output and vanishing gradients because of saturation
+
+# def lsgangp_g_loss(generator,discriminator,bs):
+#     fake_audio = generator(bs).unsqueeze(1)
+#     disc_fake = discriminator(fake_audio)
+#     loss_g = 0.0
+#     for _, score_fake in disc_fake:
+#         loss_g = loss_g+torch.mean(torch.sum(torch.pow(score_fake - 1.0, 2), dim=[1, 2]))
+#     return loss_g
+
+
+# def lsgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio,disable_GP=False):
+#     disc_fake = discriminator(fake_audio)
+#     disc_real = discriminator(real_audio)
+#     loss_d = 0.0
+#     for (_, score_fake), (_, score_real) in zip(disc_fake, disc_real):
+#         loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_real - 1.0, 2), dim=[1, 2]))
+#         loss_d = loss_d+torch.mean(torch.sum(torch.pow(score_fake, 2), dim=[1, 2]))
+#     if disable_GP is False and gp_weight is not None:
+#         loss_gp = gradient_penalty(discriminator,gp_weight,real_audio,fake_audio)
+#     else:
+#         # e.g. test step, cannot compute gradient and GP
+#         loss_gp = 0.0
+#     return loss_d,loss_gp
 
 
 """
@@ -581,16 +674,9 @@ def gradient_check(generator,discriminator,optim_g,optim_d,gan_model,gp_weight,t
     discriminator.train()
     
     print('\n\ngenerator gradient check')
-    for p in generator.parameters():
-        p.requires_grad_(True)  # unfreeze the generator
-    for p in discriminator.parameters():
-        p.requires_grad_(False)  # freeze the discriminator
-    
-    optim_g.zero_grad()
-    if gan_model=="GAN":
-        loss_g = melgan_g_loss(generator,discriminator,bs)
-    if gan_model=="WGANGP":
-        loss_g = wgangp_g_loss(generator,discriminator,bs)
+    enable_gen_disable_disc(generator,discriminator)
+    apply_zero_grad(generator,optim_g,discriminator,optim_d)
+    loss_g = __g_loss(gan_model,generator,discriminator,bs)
     loss_g.backward()
     tot_grad = 0
     named_p = generator.named_parameters()
@@ -604,22 +690,14 @@ def gradient_check(generator,discriminator,optim_g,optim_d,gan_model,gp_weight,t
         else:
             print(name,'param.grad is None')
     print('tot_grad = ',tot_grad)
-    optim_g.zero_grad()
     
     print('\n\ndiscriminator gradient check')
-    for p in generator.parameters():
-        p.requires_grad_(False)  # freeze the generator
-    for p in discriminator.parameters():
-        p.requires_grad_(True)  # unfreeze the discriminator
-    
+    enable_disc_disable_gen(generator,discriminator)
     fake_audio = generator(bs).unsqueeze(1)
     fake_audio = fake_audio.detach()
     real_audio = mb[0].unsqueeze(1).to(generator.device)
-    optim_d.zero_grad()
-    if gan_model=="GAN":
-        loss_d = melgan_d_loss(discriminator,fake_audio,real_audio)
-    if gan_model=="WGANGP":
-        loss_d,_ = wgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio)
+    apply_zero_grad(generator,optim_g,discriminator,optim_d)
+    loss_d,_ = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio)
     loss_d.backward()
     tot_grad = 0
     named_p = discriminator.named_parameters()
@@ -633,15 +711,14 @@ def gradient_check(generator,discriminator,optim_g,optim_d,gan_model,gp_weight,t
         else:
             print(name,'param.grad is None')
     print('tot_grad = ',tot_grad)
-    optim_d.zero_grad()
     
-    if gan_model=="WGANGP":
+    if gp_weight is not None:
         print('\n\ndiscriminator GP gradient check')
         fake_audio = generator(bs).unsqueeze(1)
         fake_audio = fake_audio.detach()
         real_audio = mb[0].unsqueeze(1).to(generator.device)
-        optim_d.zero_grad()
-        _,loss_gp = wgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio)
+        apply_zero_grad(generator,optim_g,discriminator,optim_d)
+        _,loss_gp = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio)
         loss_gp.backward()
         tot_grad = 0
         named_p = discriminator.named_parameters()
@@ -655,17 +732,22 @@ def gradient_check(generator,discriminator,optim_g,optim_d,gan_model,gp_weight,t
             else:
                 print(name,'param.grad is None')
         print('tot_grad = ',tot_grad)
-        optim_d.zero_grad()
 
 
 
 ###############################################################################
 ## utils stuffs
 
-def load_data(wav_dir,bs,target_sr,target_dur):
-    all_files = glob.glob(wav_dir+"*.wav")
-    if len(all_files)==0:
-        all_files = glob.glob(wav_dir+"**/*.wav")
+def load_data(wav_dir,bs,target_sr,target_dur,artists_sel):
+    if len(artists_sel)==0:
+        all_files = glob.glob(wav_dir+"*.wav")
+        if len(all_files)==0:
+            all_files = glob.glob(wav_dir+"**/*.wav")
+    else:
+        print("loading subsets",artists_sel)
+        all_files = []
+        for artist in artists_sel:
+            all_files += glob.glob(wav_dir+artist+"/*.wav")
     
     random.shuffle(all_files)
     train_files = all_files[:int(len(all_files)*0.9)]
@@ -716,5 +798,30 @@ def print_time(s_duration):
     m,s = divmod(s_duration,60)
     h, m = divmod(m, 60)
     return h, m, s
+
+
+def export_interp(generator,n_export,n_steps,output_dir,prefix,verbose=False):
+    steps = np.linspace(0.,1.,num=n_steps,endpoint=True)
+    for i in range(n_export):
+        with torch.no_grad():
+            if verbose is True:
+                print("synthesis of interp #",i)
+            if generator.z_prior=="normal":
+                z = torch.randn((2,generator.z_dim)).to(generator.device)
+            if generator.z_prior=="uniform":
+                z = torch.rand((2,generator.z_dim)).to(generator.device)
+                z = (z*2.)-1.
+            
+            z_interp = []
+            for s in steps:
+               z_interp.append(z[0,:]*float(s)+z[1,:]*(1.-float(s)))
+            z_interp = torch.stack(z_interp)
+            
+            fake_audio = generator(z_interp.shape[0],z=z_interp).cpu().numpy()
+        fake_audio = np.reshape(fake_audio,(-1))
+        sf.write(output_dir+prefix+"_interp_"+str(i)+".wav",fake_audio,generator.target_sr)
+
+
+
 
 

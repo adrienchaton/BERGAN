@@ -22,8 +22,8 @@ import shutil
 import gc
 
 
-from __nn_utils import Generator, MultiScaleDiscriminator, load_data, export_samples, export_groundtruth, print_time, melgan_g_loss, melgan_d_loss, wgangp_g_loss, wgangp_d_loss, gradient_check
-from __WaveGANGP import apply_zero_grad
+from __nn_utils import Generator, MultiScaleDiscriminator, load_data, export_samples, export_groundtruth, print_time, __g_loss, __d_loss, gradient_check, export_interp           
+from __nn_utils import apply_zero_grad,enable_disc_disable_gen,enable_gen_disable_disc,disable_all
 
 
 
@@ -34,36 +34,21 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ###############################################################################
 ## args
 
-# TODO: export interpolations with constant step size
-# TODO: add auxiliary classification of artist and conditioning generator ?
-# TODO: BERGAN = train on 4/4 techno club music
-
-# TODO: check minimum crop_steps to avoid artifact (zero padding can screw layer statistics ?)
-# note: this setting is dependent on upsampling settings (strides)
-
-# running with venv from /fast-2/adrien/torchopenl3
-
-# it seems that GAN config with WN generator and WN discriminator is not working well (generator has 0 gradient after a few epochs)
-# it seems that GAN config with BN generator and BN discriminator is behaving better
-
-# --wav_dir /fast-1/datasets/raster_16k/output_1bar_120bpm/Byetone/
-
-
-# CUDA_VISIBLE_DEVICES=0 python __train.py --mname test0_WGANGP_2d_BN_WN_crop0_drep1 --config ./gin_configs/WGANGP_2scales_BN_WN_crop0.gin --d_rep 1
-# CUDA_VISIBLE_DEVICES=1 python __train.py --mname test1_WGANGP_2d_BN_WN_crop0_G1024_drep1 --config ./gin_configs/WGANGP_2scales_BN_WN_crop0_G1024.gin --d_rep 1           
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mname',    type=str,   default="test")
 parser.add_argument('--config',    type=str,   default="./gin_configs/WGANGP_2scales_BN_WN_crop0.gin")
 parser.add_argument('--wav_dir',    type=str,   default="/fast-1/datasets/raster_16k/output_1bar_120bpm/")
-parser.add_argument('--N_epochs',    type=int,   default=400)
+parser.add_argument('--artists_sel', nargs='+', default=[])
+parser.add_argument('--N_epochs',    type=int,   default=1000)
 parser.add_argument('--d_rep',    type=int,   default=1)
 parser.add_argument('--bs',    type=int,   default=16)
 parser.add_argument('--lr_g',    type=float,   default=0.0001)
 parser.add_argument('--lr_d',    type=float,   default=0.0003)
-parser.add_argument('--export_step',    type=int,   default=2)
-parser.add_argument('--n_export',    type=int,   default=32)
+parser.add_argument('--export_step',    type=int,   default=1)
+parser.add_argument('--n_export',    type=int,   default=16)
+parser.add_argument('--e_interp',    type=int,   default=0) # export interpolation
+parser.add_argument('--e_gt',    type=int,   default=0) # export ground´truth samples
 args = parser.parse_args()
 print(args)
 
@@ -74,8 +59,12 @@ with gin.unlock_config():
     gin.parse_config_file(gin_file)
 
 
+print("RUNNING DEVICE IS ",device)
+
+
 mname = args.mname
 wav_dir = args.wav_dir
+artists_sel = args.artists_sel
 
 N_epochs = args.N_epochs
 d_rep = args.d_rep
@@ -93,12 +82,14 @@ target_dur = gin.query_parameter('%target_dur')
 
 export_step = args.export_step
 n_export = args.n_export
+e_interp = bool(args.e_interp)
+e_gt = bool(args.e_gt)
 
 
 ###############################################################################
 ## data
 
-train_dataloader,test_dataloader = load_data(wav_dir,bs,target_sr,target_dur)
+train_dataloader,test_dataloader = load_data(wav_dir,bs,target_sr,target_dur,artists_sel)
 
 
 ###############################################################################
@@ -132,29 +123,10 @@ shutil.copy(gin_file,os.path.join(mpath,mname+'_configs.gin'))
 ## init gradient check
 
 gradient_check(generator,discriminator,optim_g,optim_d,gan_model,gp_weight,train_dataloader,bs)
+# gc.collect()
+# torch.cuda.empty_cache()
 
-gc.collect()
-torch.cuda.empty_cache()
-
-# TODO: check normalization in discriminator
-
-## weight norm discriminator
-## loss_d = wgangp_d_loss has no initial gradient for last layer bias
-# discriminators.0.discriminator.6.bias sum_abs_paramgrad==0
-## loss_gp = wgangp_d_loss has no initial gradient for all layer biases
-# discriminators.0.discriminator.0.1.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.1.0.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.2.0.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.3.0.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.4.0.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.5.0.bias sum_abs_paramgrad==0
-# discriminators.0.discriminator.6.bias sum_abs_paramgrad==0
-
-## batch norm discriminator -> loss_gp only zero grad on biases 5 and 6
-
-## layer norm discriminator -> loss_gp only zero grad on biases 5 (norms) and 6 (discriminator)
-# discriminators.0.discriminator.6.bias sum_abs_paramgrad==0
-# discriminators.0.norms.5.0.bias sum_abs_paramgrad==0
+# TODO: check bias gradients in discriminator
 
 
 ###############################################################################
@@ -184,42 +156,27 @@ for epoch in range(N_epochs):
     for _,mb in enumerate(train_dataloader):
         
         # discriminator step
-        for p in generator.parameters():
-            p.requires_grad_(False)  # freeze the generator
-        for p in discriminator.parameters():
-            p.requires_grad_(True)  # unfreeze the discriminator
-        
+        enable_disc_disable_gen(generator,discriminator)
         fake_audio = generator(bs).unsqueeze(1)
         fake_audio = fake_audio.detach()
         real_audio = mb[0].unsqueeze(1).to(device)
         loss_tot_d = 0.0
-        for di in range(d_rep):
-            optim_d.zero_grad()
-            if gan_model=="GAN":
-                loss_d = melgan_d_loss(discriminator,fake_audio,real_audio)
-            if gan_model=="WGANGP":
-                loss_d,loss_gp = wgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio)
+        for di in range(d_rep): # note: if d_rep>1, best would be to resample new batches of real/fake data
+            apply_zero_grad(generator,optim_g,discriminator,optim_d)
+            loss_d,loss_gp = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio)
+            if gp_weight is not None:
                 loss_d = loss_d+loss_gp
             loss_d.backward()
             optim_d.step()
-            # loss_tot_d += loss_d
             loss_tot_d += loss_d.item()
         
         # generator step
-        for p in generator.parameters():
-            p.requires_grad_(True)  # unfreeze the generator
-        for p in discriminator.parameters():
-            p.requires_grad_(False)  # freeze the discriminator
-        
-        optim_g.zero_grad()
-        if gan_model=="GAN":
-            loss_g = melgan_g_loss(generator,discriminator,bs)
-        if gan_model=="WGANGP":
-            loss_g = wgangp_g_loss(generator,discriminator,bs)
+        enable_gen_disable_disc(generator,discriminator)
+        apply_zero_grad(generator,optim_g,discriminator,optim_d)
+        loss_g = __g_loss(gan_model,generator,discriminator,bs)
         loss_g.backward()
         optim_g.step()
         
-        # train_losslog_g += loss_g
         train_losslog_g += loss_g.item()
         train_losslog_d += loss_tot_d/d_rep
         tr_count += 1
@@ -227,45 +184,30 @@ for epoch in range(N_epochs):
         if (total_iter+1)%100==0:
             h, m, s = print_time(timeit.default_timer()-start_time)
             print('current total iterations '+str(total_iter+1)+' and elapsed time '+'%d:%02d:%02d' % (h, m, s))
-            gc.collect()
-            torch.cuda.empty_cache()
+            # gc.collect()
+            # torch.cuda.empty_cache()
     
     #### test epoch
     generator.eval()
     discriminator.eval()
+    disable_all(generator,discriminator)
     apply_zero_grad(generator,optim_g,discriminator,optim_d)
-    for p in generator.parameters():
-        p.requires_grad_(False)  # freeze the generator
-    for p in discriminator.parameters():
-        p.requires_grad_(False)  # freeze the discriminator
     for _,mb in enumerate(test_dataloader):
         with torch.no_grad():
             
             # generator step
-            if gan_model=="GAN":
-                loss_g = melgan_g_loss(generator,discriminator,bs)
-            if gan_model=="WGANGP":
-                loss_g = wgangp_g_loss(generator,discriminator,bs)
+            loss_g = __g_loss(gan_model,generator,discriminator,bs)
             
             # discriminator step
             fake_audio = generator(bs).unsqueeze(1)
-            fake_audio = fake_audio.detach()
+            # fake_audio = fake_audio.detach()
             real_audio = mb[0].unsqueeze(1).to(device)
-            if gan_model=="GAN":
-                loss_d = melgan_d_loss(discriminator,fake_audio,real_audio)
-            if gan_model=="WGANGP":
-                loss_d,loss_gp = wgangp_d_loss(discriminator,gp_weight,fake_audio,real_audio,disable_GP=True)
+            loss_d,_ = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio,disable_GP=True)
             
-            # test_losslog_g += loss_g
-            # test_losslog_d += loss_d
             test_losslog_g += loss_g.item()
             test_losslog_d += loss_d.item()
             te_count += 1
     
-    # train_losses_g.append(train_losslog_g.item()/tr_count)
-    # train_losses_d.append(train_losslog_d.item()/tr_count)
-    # test_losses_g.append(test_losslog_g.item()/te_count)
-    # test_losses_d.append(test_losslog_d.item()/te_count)
     train_losses_g.append(train_losslog_g/tr_count)
     train_losses_d.append(train_losslog_d/tr_count)
     test_losses_g.append(test_losslog_g/te_count)
@@ -288,9 +230,14 @@ for epoch in range(N_epochs):
         print("\nintermediate export")
         generator.eval()
         export_samples(generator,n_export,export_dir,"")
-        for _,mb in enumerate(train_dataloader):
-            export_groundtruth(mb[0],target_sr,export_dir,"")
-            break
+        
+        if e_gt is True:
+            for _,mb in enumerate(train_dataloader):
+                export_groundtruth(mb[0],target_sr,export_dir,"")
+                break
+        
+        if e_interp is True:
+            export_interp(generator,n_export,20,export_dir,"") # by default 20 steps == 40sec
         
         torch.save(generator.state_dict(), mpath+mname+"_Gene.pt")
         torch.save(discriminator.state_dict(), mpath+mname+"_Disc.pt")
@@ -308,8 +255,8 @@ for epoch in range(N_epochs):
         plt.savefig(mpath+mname+"losses.pdf")
         plt.close("all")
     
-    gc.collect()
-    torch.cuda.empty_cache()
+    # gc.collect()
+    # torch.cuda.empty_cache()
 
 
 
@@ -354,7 +301,6 @@ export_samples(generator,n_export,export_dir,"final")
 for _,mb in enumerate(train_dataloader):
     export_groundtruth(mb[0],target_sr,export_dir,"")
     break
-
-
+export_interp(generator,n_export,20,export_dir,"final") # by default 20 steps == 40sec
 
 
