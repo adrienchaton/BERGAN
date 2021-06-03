@@ -19,6 +19,14 @@ try other music genres with 4/4 musical structure
 train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature reconstruction in discriminator activations
 
 
+## AUDIO SAMPLES
+
+examples of random linear interpolations with 20 points equally spaced in the generator latent space = 20 bars = 40 sec.
+(training data is between 5.000 and 20.000 examples of bars extracted from recordings from the Raster Norton label)
+
+todo
+
+
 ## GAN TRAINING
 
 optimize the generator to sample realistic 1 bar audio of 2 sec. (120BPM) at SR=16kHz (extendable to 32kHz or 48kHz)
