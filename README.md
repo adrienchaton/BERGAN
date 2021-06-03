@@ -22,7 +22,10 @@ train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature
 ## AUDIO SAMPLES
 
 examples of random linear interpolations with 20 points equally spaced in the generator latent space = 20 bars = 40 sec.
-(training data is between 5.000 and 20.000 examples of bars extracted from recordings from the Raster Norton label)
+
+training data is between 5.000 and 20.000 examples of bars extracted from recordings from the "Raster Norton" label
+
+models were trained for 48 hours on V100 GPU
 
 todo
 
