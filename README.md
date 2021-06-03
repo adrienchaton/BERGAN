@@ -9,5 +9,21 @@ default working config = WGANGP_2scales_WN_WN_crop0.gin
 
 without GP, it sucks, also avoid BN discriminator with GP
 
-note: weirdly, discriminator's layer biases seem not to receive gradients :((
+
+## TODO
+
+try training at 32kHz
+
+train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature reconstruction in discriminator activations
+
+
+## GAN TRAINING
+
+
+## VAE/GAN or WAE/GAN TRAINING
+
+to come
+
+
+## GENERATION
 
