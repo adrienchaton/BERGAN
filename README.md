@@ -27,7 +27,7 @@ training data is between 5.000 and 20.000 examples of bars extracted from record
 
 models were trained for 48 hours on V100 GPU
 
-todo
+https://soundcloud.com/adrien-bitton/interpolations
 
 
 ## GAN TRAINING
