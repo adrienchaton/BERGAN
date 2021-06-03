@@ -21,6 +21,8 @@ train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature
 
 ## GAN TRAINING
 
+optimize the generator to sample realistic 1 bar audio of 2 sec. (120BPM) at SR=16kHz (extendable to 32kHz or 48kHz)
+
 <p align="center">
   <img src="./figures/bergan_gan_train.jpg" width="750" title="GAN training">
 </p>
@@ -32,4 +34,10 @@ to come
 
 
 ## GENERATION
+
+sample series of 1 bar audio along a random linear interpolation and concatenate the generator outputs into a track at fixed BPM with progressive variation of rhythmic and acoustic content
+
+<p align="center">
+  <img src="./figures/bergan_interp.jpg" width="750" title="generator interpolation">
+</p>
 
