@@ -14,10 +14,16 @@ without GP, it sucks, also avoid BN discriminator with GP
 
 try training at 32kHz
 
+try other music genres with 4/4 musical structure
+
 train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature reconstruction in discriminator activations
 
 
 ## GAN TRAINING
+
+<p align="center">
+  <img src="./figures/bergan_gan_train.jpg" width="750" title="GAN training">
+</p>
 
 
 ## VAE/GAN or WAE/GAN TRAINING
