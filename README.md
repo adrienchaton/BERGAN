@@ -7,7 +7,9 @@ unconditional generator and multi-scale discriminators, default working config =
 
 without GP the GANs are very prone to mode collapse/overfitting, also avoid BN discriminator with GP
 
-minimal requirements, can be installed with pip in a python3 virtualenv
+minimal requirements, can be installed with pip in a python3 virtualenv (pip install -r requirements.txt)
+
+these requirements do not cover the data preparation pipelines edscribed at the bottom of the readme
 
 
 ## TODO
