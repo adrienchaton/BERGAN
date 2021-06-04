@@ -3,7 +3,7 @@
 
 trying to make techno with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
 
-generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
+unconditional generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
 
 without GP the GANs are very prone to mode collapse/overfitting, also avoid BN discriminator with GP
 
@@ -27,7 +27,7 @@ training data is between 5.000 and 20.000 examples of bars extracted from record
 
 https://raster-media.net (I do not own copyrights, this is an independent research experiment)
 
-models were trained for 48 hours on V100 GPU ; sampling of 40 sec. on Macbook Pro CPU (2015) takes about 3 sec. so the inference speed is reasonable
+models were trained for 48 hours on a single V100 GPU (a 12GB GPU is fine too) ; sampling of 40 sec. on Macbook Pro CPU (2015) takes about 3 sec. so the inference speed is reasonable
 
 https://soundcloud.com/adrien-bitton/interpolations
 
