@@ -1,13 +1,13 @@
 # BERGAN
 
 
-trying to make techno with GANs, default is to train on 2sec audio clips at 16kHz = 1 bar 4/4 at 120BPM
+trying to make techno with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
 
-generator and multi-scale discriminators derived from the MelGAN architecture
+generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
 
-default working config = WGANGP_2scales_WN_WN_crop0.gin
+without GP the GANs are very prone to mode collapse/overfitting, also avoid BN discriminator with GP
 
-without GP, it sucks, also avoid BN discriminator with GP
+minimal requirements, can be installed with pip in a python3 virtualenv
 
 
 ## TODO
@@ -23,9 +23,11 @@ train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature
 
 examples of random linear interpolations with 20 points equally spaced in the generator latent space = 20 bars = 40 sec.
 
-training data is between 5.000 and 20.000 examples of bars extracted from recordings from the "Raster Norton" label
+training data is between 5.000 and 20.000 examples of bars extracted from recordings of the "Raster Norton" label
 
-models were trained for 48 hours on V100 GPU
+https://raster-media.net (I do not own copyrights, this is an independent research experiment)
+
+models were trained for 48 hours on V100 GPU ; sampling of 40 sec. on Macbook Pro CPU (2015) takes about 3 sec. so the inference speed is reasonable
 
 https://soundcloud.com/adrien-bitton/interpolations
 
@@ -51,4 +53,23 @@ sample series of 1 bar audio along a random linear interpolation and concatenate
 <p align="center">
   <img src="./figures/bergan_interp.jpg" width="750" title="generator interpolation">
 </p>
+
+
+## RELATED PAPERS AND REPOSITORIES
+
+MelGAN
+
+https://arxiv.org/abs/1910.06711
+
+https://github.com/seungwonpark/melgan
+
+WaveGAN
+
+https://arxiv.org/abs/1802.04208
+
+https://github.com/mostafaelaraby/wavegan-pytorch
+
+and a nice review of GAN frameworks
+
+https://arxiv.org/abs/1807.04720
 
