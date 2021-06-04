@@ -23,7 +23,6 @@ import gc
 
 
 from __nn_utils import Generator, export_interp
-from __WaveGANGP import WaveGANGenerator
 
 
 
@@ -34,41 +33,36 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 pretrained_dir = "./outputs/"
 
-mname = "CAN_02_WGANGP_3d_BN_WN_crop0_drep1"
+mnames = ["CAN_09_WGANGP_3d_BN_WN_crop0_gp50_drep1",
+          "CAN_10_WGANGP_3d_BN_WN_crop0_drep1_databars_By_Da",
+          "CAN_11_WGANGP_3d_BN_WN_crop0_drep1_databars_Fr_Gr"]
 
-mpath = pretrained_dir+mname+"/"
-export_path = mpath+"play_0/"
-
-os.makedirs(export_path)
-
-gin_file = os.path.join(mpath,mname+'_configs.gin')
-args = np.load(os.path.join(mpath,mname+'_args.npy'),allow_pickle=True).item()
-
-
-print("gin.parse_config_file",gin_file)
-with gin.unlock_config():
-    gin.parse_config_file(gin_file)
-
-
-try:
-    gan_model = gin.query_parameter('%gan_model')
-except:
-    gan_model = "WAVEGAN"
+for mname in mnames:
     
-if gan_model!="WAVEGAN":
+    mpath = pretrained_dir+mname+"/"
+    export_path = mpath+"play_0/"
+    
+    os.makedirs(export_path)
+    
+    gin_file = os.path.join(mpath,mname+'_configs.gin')
+    args = np.load(os.path.join(mpath,mname+'_args.npy'),allow_pickle=True).item()
+    
+    
+    print("gin.parse_config_file",gin_file)
+    with gin.unlock_config():
+        gin.parse_config_file(gin_file)
+    
+    
     generator = Generator()
     generator.load_state_dict(torch.load(os.path.join(mpath,mname+'_Gene.pt'), map_location='cpu'))
     generator.remove_weight_norm()
-else:
-    generator = WaveGANGenerator()
-    generator.load_state_dict(torch.load(os.path.join(mpath,mname+'_Gene.pt'), map_location='cpu'))
-
-generator.to(device)
-generator.device = device
-generator.eval()
-
-
-export_interp(generator,10,20,export_path,"",verbose=True)
+    
+    generator.to(device)
+    generator.device = device
+    generator.eval()
+    
+    
+    export_interp(generator,20,20,export_path,"",verbose=True)
 
 
 
