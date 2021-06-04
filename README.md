@@ -18,7 +18,7 @@ try other music genres with 4/4 musical structure
 
 train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature reconstruction in discriminator activations
 
-make a google colab demo
+make a google colab demo (with pretrained models to run in __export_interp.py)
 
 
 ## AUDIO SAMPLES
