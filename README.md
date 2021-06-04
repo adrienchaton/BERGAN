@@ -73,3 +73,15 @@ and a nice review of GAN frameworks
 
 https://arxiv.org/abs/1807.04720
 
+
+## ACKNOWLEDGEMENTS
+
+thanks to Philippe Esling (https://github.com/acids-ircam) and Thomas Haferlach (https://github.com/voodoohop) for their help in developping the data preparation pipelines
+
+data preparation aims at extracting music bars aligned on the downbeat and stretching them to the target BPM
+
+we either rely on python packages (e.g. librosa, madmom) or on parsing warp markers from Ableton .asd files (https://github.com/voodoohop/extract-warpmarkers)
+
+thanks as well to Antoine Caillon (https://github.com/caillonantoine) for insightful discussion on the challenges of training GANs
+
+and thanks to IRCAM and Compute Canada for the allowed computation ressources for training models
