@@ -9,7 +9,7 @@ without GP the GANs are very prone to mode collapse/overfitting, also avoid BN d
 
 minimal requirements, can be installed with pip in a python3 virtualenv (pip install -r requirements.txt)
 
-these requirements do not cover the data preparation pipelines edscribed at the bottom of the readme
+these requirements do not cover the data preparation pipelines described at the bottom of the readme
 
 
 ## TODO
