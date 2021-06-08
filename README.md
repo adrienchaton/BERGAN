@@ -1,7 +1,7 @@
 # BERGAN
 
 
-trying to make techno with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
+experiment to make techno music with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
 
 unconditional generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
 
