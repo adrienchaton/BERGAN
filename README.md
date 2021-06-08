@@ -11,6 +11,8 @@ minimal requirements, can be installed with pip in a python3 virtualenv (pip ins
 
 these requirements do not cover the data preparation pipelines described at the bottom of the readme
 
+(work in progress, project submitted to an open call)
+
 
 ## TODO
 
