@@ -1,4 +1,4 @@
-# BERGAN
+# BERGAN: music bar generation and techno music with GANs
 
 
 experiment to make techno music with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
@@ -35,7 +35,7 @@ https://raster-media.net (I do not own copyrights, this is an independent resear
 
 models were trained for 48 hours on a single V100 GPU (a 12GB GPU is fine too) ; sampling of 40 sec. on Macbook Pro CPU (2015) takes about 3 sec. so the inference speed is reasonable
 
-https://soundcloud.com/adrien-bitton/interpolations
+raw audio outputs of the models at 16kHz --> https://soundcloud.com/adrien-bitton/interpolations
 
 
 ## GAN TRAINING
