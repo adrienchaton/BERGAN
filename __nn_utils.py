@@ -23,10 +23,8 @@ import librosa
 import gin
 
 
-
-## nn stuffs
-## based on https://github.com/seungwonpark/melgan/blob/master/model/generator.py
-
+## UTILS FOR THE GANs TRAINING
+## nn architectures based on https://github.com/seungwonpark/melgan/blob/master/model
 
 
 ###############################################################################
@@ -231,7 +229,7 @@ class Generator(nn.Module):
 # should take care of removing weight norm during inference after training
 
 # see https://github.com/seungwonpark/melgan/issues/8
-# inference with zero padding at the end to avoid a click at the end
+# inference with zero padding at the end of the input to avoid a click at the end of the output audio
 
 
 
@@ -478,8 +476,11 @@ class MultiScaleDiscriminator(nn.Module):
             self.discriminators = nn.ModuleList(discriminators)
         
         self.apply(init_weights)
-
+    
     def forward(self, x):
+        if len(x.shape)==2:
+            x = x.unsqueeze(1)
+        
         ret = list()
 
         for pool, disc in zip(self.pooling, self.discriminators):
@@ -487,7 +488,7 @@ class MultiScaleDiscriminator(nn.Module):
             ret.append(disc(x))
 
         return ret # [(feat, score), (feat, score), (feat, score)]
-
+        
 
 
 ###############################################################################
@@ -630,36 +631,6 @@ def __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio,disable_GP=
 #         # e.g. test step, cannot compute gradient and GP
 #         loss_gp = 0.0
 #     return loss_d,loss_gp
-
-
-"""
-###############################################################################
-## testing
-
-bs = 2 # default is 16
-lr = 0.0001
-beta1 = 0.5
-beta2 = 0.9
-target_sr = 16000
-target_dur = 2.
-true_audio = torch.randn((bs,int(target_dur*target_sr)))
-
-
-generator = Generator(z_prior="normal", dense_chan_out=16,target_sr=target_sr,z_dim=128,target_dur=target_dur,strides=[4,4,4,4,4],
-                 dense_hidden=1024,n_dense=3,dense_norm="BN",conv_norm="BN",chan_in=512,crop_steps=10,dp=0.)
-generator.device = "cpu"
-discriminator = MultiScaleDiscriminator(disc_norm="LN",disc_scales=3,target_sr=target_sr,target_dur=target_dur)
-
-generator.train()
-fake_audio = generator.forward(bs) # (batchnorm only forward on bs=1 in eval mode)
-
-disc_fake = discriminator(fake_audio.unsqueeze(1))
-for _, score_fake in disc_fake:
-    print(score_fake.shape)
-    # torch.Size([bs, 1, 125])
-    # torch.Size([bs, 1, 63])
-    # torch.Size([bs, 1, 32])
-"""
 
 
 ###############################################################################
@@ -820,6 +791,11 @@ def export_interp(generator,n_export,n_steps,output_dir,prefix,verbose=False):
             fake_audio = generator(z_interp.shape[0],z=z_interp).cpu().numpy()
         fake_audio = np.reshape(fake_audio,(-1))
         sf.write(output_dir+prefix+"_interp_"+str(i)+".wav",fake_audio,generator.target_sr)
+
+
+
+
+
 
 
 

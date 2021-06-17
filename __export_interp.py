@@ -25,6 +25,10 @@ import gc
 from __nn_utils import Generator, export_interp
 
 
+# TODO: merge export scripts into one
+
+## INTERPOLATION EXPORT SCRIPT FOR THE GANs
+
 
 gin.enter_interactive_mode()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'

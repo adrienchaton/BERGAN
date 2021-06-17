@@ -26,6 +26,8 @@ from __nn_utils import Generator, MultiScaleDiscriminator, load_data, export_sam
 from __nn_utils import apply_zero_grad,enable_disc_disable_gen,enable_gen_disable_disc,disable_all
 
 
+## TRAINING SCRIPT FOR THE GANs
+
 
 torch.backends.cudnn.benchmark = True
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -41,7 +43,6 @@ parser.add_argument('--config',    type=str,   default="./gin_configs/WGANGP_2sc
 parser.add_argument('--wav_dir',    type=str,   default="/fast-1/datasets/raster_16k/output_1bar_120bpm/")
 parser.add_argument('--artists_sel', nargs='+', default=[])
 parser.add_argument('--N_epochs',    type=int,   default=1000)
-parser.add_argument('--d_rep',    type=int,   default=1)
 parser.add_argument('--bs',    type=int,   default=16)
 parser.add_argument('--lr_g',    type=float,   default=0.0001)
 parser.add_argument('--lr_d',    type=float,   default=0.0003)
@@ -67,7 +68,6 @@ wav_dir = args.wav_dir
 artists_sel = args.artists_sel
 
 N_epochs = args.N_epochs
-d_rep = args.d_rep
 bs = args.bs
 lr_g = args.lr_g
 lr_d = args.lr_d
@@ -136,6 +136,7 @@ start_time = timeit.default_timer()
 
 total_iter = 0
 
+# TODO: clean that and fix tensorboard install
 train_losses_g = []
 train_losses_d = []
 test_losses_g = []
@@ -160,15 +161,12 @@ for epoch in range(N_epochs):
         fake_audio = generator(bs).unsqueeze(1)
         fake_audio = fake_audio.detach()
         real_audio = mb[0].unsqueeze(1).to(device)
-        loss_tot_d = 0.0
-        for di in range(d_rep): # note: if d_rep>1, best would be to resample new batches of real/fake data
-            apply_zero_grad(generator,optim_g,discriminator,optim_d)
-            loss_d,loss_gp = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio)
-            if gp_weight is not None:
-                loss_d = loss_d+loss_gp
-            loss_d.backward()
-            optim_d.step()
-            loss_tot_d += loss_d.item()
+        apply_zero_grad(generator,optim_g,discriminator,optim_d)
+        loss_d,loss_gp = __d_loss(gan_model,discriminator,gp_weight,fake_audio,real_audio)
+        if gp_weight is not None:
+            loss_d = loss_d+loss_gp
+        loss_d.backward()
+        optim_d.step()
         
         # generator step
         enable_gen_disable_disc(generator,discriminator)
@@ -178,7 +176,7 @@ for epoch in range(N_epochs):
         optim_g.step()
         
         train_losslog_g += loss_g.item()
-        train_losslog_d += loss_tot_d/d_rep
+        train_losslog_d += loss_d.item()
         tr_count += 1
         total_iter += 1
         if (total_iter+1)%100==0:
