@@ -1,6 +1,10 @@
 # BERGAN: music bar generation and techno music with GANs
 
-(work in progress, project submitted to an open call)
+work in progress, project submitted to an open call
+
+minimal requirements, can be installed with pip in a python3 virtualenv (pip install -r requirements.txt)
+
+these requirements do not cover the data preparation pipelines described at the bottom of the readme
 
 
 ## GANs ONLY EXPERIMENT
@@ -10,10 +14,6 @@ experiment to make techno music with GANs, default is to train on 2 sec. audio c
 unconditional generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
 
 without GP the GANs are very prone to mode collapse/overfitting, also avoid BN discriminator with GP
-
-minimal requirements, can be installed with pip in a python3 virtualenv (pip install -r requirements.txt)
-
-these requirements do not cover the data preparation pipelines described at the bottom of the readme
 
 the corresponding configs have suffixes = WGAN or LSGAN = wasserstein or least-square
 
