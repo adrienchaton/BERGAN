@@ -9,6 +9,8 @@ these requirements do not cover the data preparation pipelines described at the 
 
 ## GANs ONLY EXPERIMENT
 
+code base = __export_interp.py + __nn_utils.py + __train.py
+
 experiment to make techno music with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
 
 unconditional generator and multi-scale discriminators, default working config = WGANGP_2scales_WN_WN_crop0.gin
@@ -19,6 +21,8 @@ the corresponding configs have suffixes = WGAN or LSGAN = wasserstein or least-s
 
 
 ## AEs+GANs EXPERIMENT
+
+code base = __export_interp_ae.py + __nn_utils_ae.py + __train_ae.py
 
 train as a AE/GAN (or VAE/GAN or WAE/GAN) to avoid mode collapse of GAN = more stable training without GP and possibly better mode coverage
 
