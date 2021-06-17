@@ -1,0 +1,56 @@
+# -*-Python-*-
+
+# Generator and Discriminator configs with weightnorm
+
+
+import __nn_utils
+import __nn_utils_ae
+
+
+beta1 = 0.1
+beta2 = 0.9
+
+target_sr = 16000
+target_dur = 2.
+
+# hardcoded adv_weight=0.1
+feat_match = 1.
+use_stft_dist = True
+total_weight = 10.
+
+target_reg_weight = 0.
+warmup_reg_weight = False
+
+
+__nn_utils_ae.AE.encoder_norm = "BN"
+__nn_utils_ae.AE.encoder_scales = 3
+__nn_utils_ae.AE.z_dim = 220
+__nn_utils_ae.AE.e_n_h = 2
+__nn_utils_ae.AE.regularizer = "none"
+__nn_utils_ae.AE.target_sr = %target_sr
+__nn_utils_ae.AE.target_dur = %target_dur
+__nn_utils_ae.AE.d_dense_chan_out = 32
+__nn_utils_ae.AE.d_strides = [4,4,4,4,4]
+__nn_utils_ae.AE.d_hiddens = -1
+__nn_utils_ae.AE.d_n_h = 1
+__nn_utils_ae.AE.decoder_norm = "WN"
+__nn_utils_ae.AE.d_chan_in = 512
+__nn_utils_ae.AE.crop_steps = 0
+__nn_utils_ae.AE.dp = 0.
+
+
+__nn_utils.MultiScaleDiscriminator.disc_norm = "WN"
+__nn_utils.MultiScaleDiscriminator.disc_scales = 3
+__nn_utils.MultiScaleDiscriminator.target_sr = %target_sr
+__nn_utils.MultiScaleDiscriminator.target_dur = %target_dur
+
+
+__nn_utils_ae.stft_dist.total_weight = %total_weight
+__nn_utils_ae.stft_dist.log_weight = 1.
+__nn_utils_ae.stft_dist.scales = [4096, 2048, 1024, 512, 256, 128]
+__nn_utils_ae.stft_dist.overlap = 0.75
+
+
+
+
+
