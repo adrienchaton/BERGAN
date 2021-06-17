@@ -1,5 +1,9 @@
 # BERGAN: music bar generation and techno music with GANs
 
+(work in progress, project submitted to an open call)
+
+
+## GANs ONLY EXPERIMENT
 
 experiment to make techno music with GANs, default is to train on 2 sec. audio clips at 16kHz = 1 bar 4/4 at 120BPM
 
@@ -11,7 +15,20 @@ minimal requirements, can be installed with pip in a python3 virtualenv (pip ins
 
 these requirements do not cover the data preparation pipelines described at the bottom of the readme
 
-(work in progress, project submitted to an open call)
+the corresponding configs have suffixes = WGAN or LSGAN = wasserstein or least-square
+
+
+## AEs+GANs EXPERIMENT
+
+train as a AE/GAN (or VAE/GAN or WAE/GAN) to avoid mode collapse of GAN = more stable training without GP and possibly better mode coverage
+
+use deep feature reconstruction in discriminator activations and optional multi-scale spectrogram reconstruction
+
+VAE/GAN adds the KLD regularization to the encoder and WAE/GAN adds the MMD regularization = both impose a gaussian prior for sampling and interpolation
+
+the corresponding configs have suffixes = AE_GAN or VAE_GAN (variational ae) or WAE_GAN (wasserstein ae)
+
+the GAN is only trained as least-square without gradient penalty
 
 
 ## TODO
@@ -20,12 +37,10 @@ try training at 32kHz
 
 try other music genres with 4/4 musical structure
 
-train as a VAE/GAN or WAE/GAN to avoid mode collapse of GAN and use deep feature reconstruction in discriminator activations
-
 make a google colab demo (with pretrained models to run in __export_interp.py)
 
 
-## AUDIO SAMPLES
+## AUDIO SAMPLES (GANs only)
 
 examples of random linear interpolations with 20 points equally spaced in the generator latent space = 20 bars = 40 sec.
 
@@ -47,9 +62,14 @@ optimize the generator to sample realistic 1 bar audio of 2 sec. (120BPM) at SR=
 </p>
 
 
-## VAE/GAN or WAE/GAN TRAINING
+## AUDIO SAMPLES (AEs+GANs)
 
 to come
+
+
+## AEs+GANs TRAINING
+
+figure to come
 
 
 ## GENERATION
@@ -75,9 +95,13 @@ https://arxiv.org/abs/1802.04208
 
 https://github.com/mostafaelaraby/wavegan-pytorch
 
-and a nice review of GAN frameworks
+nice review of GAN frameworks
 
 https://arxiv.org/abs/1807.04720
+
+the AEs+GANs framework 
+
+https://arxiv.org/abs/1512.09300
 
 
 ## ACKNOWLEDGEMENTS
