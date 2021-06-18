@@ -43,6 +43,10 @@ try other music genres with 4/4 musical structure
 
 make a google colab demo (with pretrained models to run in __export_interp.py)
 
+**try inpainting application e.g. generation from loudness or transient curve to audio**
+
+**--> convert acoustic drum loop or hand tapping to music bar**
+
 
 ## AUDIO SAMPLES (GANs only)
 
