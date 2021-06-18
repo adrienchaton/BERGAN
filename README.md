@@ -12,7 +12,7 @@ these requirements do not cover the data preparation pipelines described at the 
 
 **_ next application is "inpainting" e.g. generation from loudness or transient curve to audio**
 
-**--> convert acoustic drum loop or hand tapping to music bar**
+**--> convert acoustic drum loop or hand tapping to music bars**
 
 
 ## GANs ONLY EXPERIMENT
