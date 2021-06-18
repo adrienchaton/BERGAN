@@ -86,7 +86,7 @@ figure to come
 
 ## GENERATION
 
-sample series of 1 bar audio along a random linear interpolation and concatenate the generator outputs into a track at fixed BPM with progressive variation of rhythmic and acoustic content
+sample series of 1 bar audio along a random linear interpolation and concatenate the generator outputs into a track at fixed BPM with progressive variation of rhythmic and acoustic contents
 
 <p align="center">
   <img src="./figures/bergan_interp.jpg" width="750" title="generator interpolation">
